@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Factory Locations & Updates Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- PapaParse for Google Sheet CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e293b; color: white; }
+        
+        /* Layout */
+        #sidebar { width: 32%; overflow-y: auto; background-color: #0f172a; padding: 20px; box-sizing: border-box; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        #map { width: 68%; height: 100%; z-index: 1; }
+        
+        /* Sidebar Styling */
+        h1 { font-size: 1.2rem; margin-top: 0; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 15px; }
+        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 18px; margin-bottom: 15px; cursor: pointer; transition: all 0.2s ease; }
+        .card:hover { border-color: #38bdf8; transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
+        .card h2 { font-size: 1.15rem; margin: 0 0 12px 0; color: #38bdf8; }
+        .details { font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; }
+        .date { font-size: 0.75rem; color: #64748b; margin-top: 12px; font-style: italic; }
+        
+        /* Status Tags */
+        .tag { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .tag.Operating { background: #166534; color: #86efac; }
+        .tag.Completed { background: #166534; color: #86efac; }
+        .tag.Awarded { background: #854d0e; color: #fef08a; }
+        .tag.Under-Construction { background: #991b1b; color: #fca5a5; }
+
+        /* Custom Leaflet Legend Control */
+        .info.legend { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4); color: #334155; font-size: 13px; line-height: 20px; max-width: 250px;}
+        .info.legend h4 { margin: 0 0 10px; font-size: 14px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;}
+        .info.legend i { width: 14px; height: 14px; float: left; margin-right: 8px; opacity: 0.9; border-radius: 50%; margin-top: 3px;}
+        
+        /* Map Popup Styling */
+        .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 8px; border: 1px solid #334155; }
+        .leaflet-popup-tip { background: #1e293b; }
+        .leaflet-popup-content b { color: #38bdf8; font-size: 1.1em;}
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h1>Management Review Dashboard</h1>
+        <div id="card-container">Loading approved updates...</div>
+    </div>
+    
+    <div id="map"></div>
+
+    <script>
+        // 1. Define Base Maps (Matches the options in your screenshot)
+        const satelliteEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        const lightGrayEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+        });
+
+        const openStreetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        });
+
+        // 2. Initialize Map (Defaulting to Satellite view)
+        const map = L.map('map', {
+            center: [2.5, 112.0], // Centered over Malaysia/Indonesia region
+            zoom: 6,
+            layers: [satelliteEsri] // Default map
+        });
+
+        // 3. Add Layer Control (The Top-Right Menu from your screenshot)
+        const baseMaps = {
+            "Satellite Esri": satelliteEsri,
+            "Simplicity · Esri Light Gray": lightGrayEsri,
+            "Standard OpenStreetMap": openStreetMap
+        };
+        L.control.layers(baseMaps, null, {position: 'topright', collapsed: false}).addTo(map);
+
+        // 4. Add Custom Floating Legend (Bottom Right)
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            div.innerHTML = `
+                <h4>Legend · Status</h4>
+                <i style="background: #16a34a"></i> Already in operation / Completed<br>
+                <i style="background: #ea580c"></i> Under construction<br>
+                <i style="background: #9333ea"></i> Awarded (CLoA)<br>
+                <i style="background: #dc2626"></i> In the bidding process<br>
+                <i style="background: #64748b"></i> Planning and construction<br>
+                <br>
+                <h4>Sector</h4>
+                <b>🏭</b> Assembly / Manufacturing<br>
+                <b>♻️</b> Waste-to-Energy<br>
+                <b>💻</b> Data Center<br>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // 5. Setup Marker Colors Based on Status
+        function getMarkerColor(status) {
+            const s = (status || '').toLowerCase();
+            if (s.includes('operation') || s.includes('completed')) return '#16a34a'; // Green
+            if (s.includes('construction')) return '#ea580c'; // Orange
+            if (s.includes('awarded')) return '#9333ea'; // Purple
+            if (s.includes('bidding')) return '#dc2626'; // Red
+            return '#3b82f6'; // Default Blue
+        }
+
+        // --- PASTE YOUR EXACT PUBLISHED CSV LINK HERE ---
+        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS8CWPQ4VAx1R47aR4IBqHpIbrJVraBd2eajHr0ZZCY3SsGOu2NuB13E7NEnVaIha-i9FCEhI2D7Vq7/pub?gid=594499741&single=true&output=csv';
+
+        // 6. Fetch Data and Build the Dashboard
+        Papa.parse(csvUrl + '&cachebuster=' + new Date().getTime(), {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                const data = results.data;
+                const container = document.getElementById('card-container');
+                container.innerHTML = ''; 
+
+                const markers = []; // Array to hold markers for auto-fitting bounds
+
+                data.forEach((row) => {
+                    // Critical Vetting Step: Only show rows you manually marked TRUE
+                    if (row.Approved_For_Publish !== 'TRUE') return;
+
+                    const lat = parseFloat(row.Latitude);
+                    const lng = parseFloat(row.Longitude);
+                    if (isNaN(lat) || isNaN(lng)) return; 
+
+                    // Create Custom Colored Circle Marker
+                    const marker = L.circleMarker([lat, lng], {
+                        radius: 8,
+                        fillColor: getMarkerColor(row.Status),
+                        color: "#ffffff",
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    }).addTo(map);
+                    
+                    marker.bindPopup(`<b>${row.Factory_Name}</b><br>${row.Status}<br><i>${row.Category}</i>`);
+                    markers.push([lat, lng]); // Store coordinates
+
+                    // Build Sidebar Card
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    const statusClass = (row.Status || '').replace(/\s+/g, '-');
+
+                    // Determine Sector Icon
+                    let icon = '🏭';
+                    if ((row.Category || '').toLowerCase().includes('waste')) icon = '♻️';
+                    if ((row.Category || '').toLowerCase().includes('data')) icon = '💻';
+
+                    card.innerHTML = `
+                        <h2>${icon} ${row.Factory_Name}</h2>
+                        <span class="tag ${statusClass}">${row.Status}</span>
+                        <div class="details">
+                            <strong>Category:</strong> ${row.Category}<br>
+                            <strong>Metrics:</strong> ${row.Key_Metrics || 'N/A'}<br><br>
+                            <strong>Latest Update:</strong><br>${row.Latest_Update || 'No updates available.'}
+                        </div>
+                        <div class="date">Last Updated: ${row.Last_Updated_Date || 'Unknown'}</div>
+                    `;
+
+                    // Interaction: Click Card -> Zoom Map
+                    card.addEventListener('click', () => {
+                        map.flyTo([lat, lng], 14, { duration: 1.5 });
+                        marker.openPopup();
+                    });
+
+                    // Interaction: Click Map Marker -> Scroll to Card
+                    marker.on('click', () => {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        card.style.borderColor = '#38bdf8';
+                        card.style.backgroundColor = '#0f172a';
+                        setTimeout(() => { 
+                            card.style.borderColor = '#334155'; 
+                            card.style.backgroundColor = '#1e293b'; 
+                        }, 2500);
+                    });
+
+                    container.appendChild(card);
+                });
+
+                // Automatically zoom map to fit all approved markers
+                if (markers.length > 0) {
+                    map.fitBounds(markers, { padding: [50, 50] });
+                }
+
+                if (container.innerHTML === '') {
+                    container.innerHTML = '<p style="color: #94a3b8; padding: 20px;">No approved updates available at the moment. Waiting for manager review.</p>';
+                }
+            },
+            error: function(err) {
+                document.getElementById('card-container').innerHTML = '<p style="color: #ef4444;">Failed to load data from Google Sheet. Please check the publish link and permissions.</p>';
+                console.error("CSV Fetch Error: ", err);
+            }
+        });
+    </script>
+</body>
+</html>
