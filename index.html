@@ -77,9 +77,8 @@
 
         // 3. Add Layer Control (The Top-Right Menu from your screenshot)
         const baseMaps = {
-            "Satellite Esri": satelliteEsri,
-            "Simplicity · Esri Light Gray": lightGrayEsri,
-            "Standard OpenStreetMap": openStreetMap
+            "Satellite": satelliteEsri,
+            "Standard": openStreetMap
         };
         L.control.layers(baseMaps, null, {position: 'topright', collapsed: false}).addTo(map);
 
@@ -96,9 +95,9 @@
                 <i style="background: #64748b"></i> Planning and construction<br>
                 <br>
                 <h4>Sector</h4>
-                <b>🏭</b> Assembly / Manufacturing<br>
+                <b>🏭</b> Manufacturing<br>
                 <b>♻️</b> Waste-to-Energy<br>
-                <b>💻</b> Data Center<br>
+                <b>💻</b> TBA<br>
             `;
             return div;
         };
