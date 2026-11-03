@@ -29,10 +29,16 @@
         
         /* Status Tags */
         .tag { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
-        .tag.Operating { background: #166534; color: #86efac; }
-        .tag.Completed { background: #166534; color: #86efac; }
-        .tag.Awarded { background: #854d0e; color: #fef08a; }
-        .tag.Under-Construction { background: #991b1b; color: #fca5a5; }
+        /* Green: In Operation / Completed */
+        .tag[class*="Operation"], .tag[class*="operation"], .tag[class*="Completed"], .tag[class*="completed"], .tag.Operating { background: #166534; color: #86efac; }
+        /* Blue: Under construction */
+        .tag[class*="construction"], .tag[class*="Construction"] { background: #1e40af; color: #93c5fd; }
+        /* Red: Awarded */
+        .tag[class*="Awarded"], .tag[class*="awarded"] { background: #991b1b; color: #fca5a5; }
+        /* Yellow: In bidding / tender */
+        .tag[class*="bidding"], .tag[class*="tender"], .tag[class*="Bidding"], .tag[class*="Tender"] { background: #854d0e; color: #fef08a; }
+        /* Grey: Planning */
+        .tag[class*="Planning"], .tag[class*="planning"] { background: #334155; color: #cbd5e1; }
 
         /* Custom Leaflet Legend Control */
         .info.legend { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.4); color: #334155; font-size: 13px; line-height: 20px; max-width: 250px;}
@@ -88,11 +94,11 @@
             const div = L.DomUtil.create('div', 'info legend');
             div.innerHTML = `
                 <h4>Legend · Status</h4>
-                <i style="background: #16a34a"></i> In operation / Completed<br>
-                <i style="background: #ea580c"></i> Under construction<br>
-                <i style="background: #9333ea"></i> Awarded<br>
-                <i style="background: #dc2626"></i> In the bidding process<br>
-                <i style="background: #64748b"></i> Planning and construction<br>
+                <i style="background: #16a34a"></i> In Operation / Completed<br>
+                <i style="background: #2563eb"></i> Under construction<br>
+                <i style="background: #dc2626"></i> Awarded<br>
+                <i style="background: #eab308"></i> In bidding / tender<br>
+                <i style="background: #64748b"></i> Planning<br>
                 <br>
                 <h4>Sector</h4>
                 <b>🏭</b> Manufacturing<br>
@@ -107,10 +113,11 @@
         function getMarkerColor(status) {
             const s = (status || '').toLowerCase();
             if (s.includes('operation') || s.includes('completed')) return '#16a34a'; // Green
-            if (s.includes('construction')) return '#ea580c'; // Orange
-            if (s.includes('awarded')) return '#9333ea'; // Purple
-            if (s.includes('bidding')) return '#dc2626'; // Red
-            return '#3b82f6'; // Default Blue
+            if (s.includes('construction')) return '#2563eb'; // Blue
+            if (s.includes('awarded')) return '#dc2626'; // Red
+            if (s.includes('bidding') || s.includes('tender')) return '#eab308'; // Yellow
+            if (s.includes('planning')) return '#64748b'; // Grey
+            return '#64748b'; // Default Blue
         }
 
         // --- PASTE YOUR EXACT PUBLISHED CSV LINK HERE ---
