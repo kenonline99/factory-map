@@ -57,7 +57,7 @@
             letter-spacing: 0.5px;
         }
 
-        /* Filter Buttons Bar */
+        /* Filter Buttons Bar (Industry) */
         .filter-container {
             display: flex;
             flex-wrap: wrap;
@@ -92,13 +92,13 @@
             box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
         }
 
-        /* Color dots inside buttons */
+        /* Color dots inside buttons (Industry Colors) */
         .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .dot-green { background: #16a34a; }
-        .dot-blue { background: #2563eb; }
-        .dot-red { background: #dc2626; }
-        .dot-yellow { background: #eab308; }
-        .dot-grey { background: #64748b; }
+        .dot-wte { background: #10b981; } /* Emerald */
+        .dot-assembly { background: #3b82f6; } /* Blue */
+        .dot-municipal { background: #8b5cf6; } /* Purple */
+        .dot-manufacturing { background: #f59e0b; } /* Amber */
+        .dot-others { background: #6b7280; } /* Gray */
 
         /* Card Scroll Area */
         #card-container {
@@ -183,10 +183,25 @@
             color: #334155; 
             font-size: 12px; 
             line-height: 19px; 
-            max-width: 230px;
+            max-width: 250px;
         }
         .info.legend h4 { margin: 0 0 6px; font-size: 13px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;}
         .info.legend i { width: 13px; height: 13px; float: left; margin-right: 7px; opacity: 0.9; border-radius: 50%; margin-top: 3px;}
+        
+        /* Clickable Legend Items */
+        .legend-item {
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .legend-item:hover {
+            background-color: #f1f5f9;
+        }
+        .legend-item.active {
+            background-color: #e2e8f0;
+            font-weight: bold;
+        }
         
         /* Map Popup */
         .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 8px; border: 1px solid #334155; }
@@ -201,12 +216,12 @@
         <div class="sidebar-header">
             <h1>Review Dashboard</h1>
             <div class="filter-container">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="completed"><span class="dot dot-green"></span> In Operation / Completed</button>
-                <button class="filter-btn" data-filter="construction"><span class="dot dot-blue"></span> Under Construction</button>
-                <button class="filter-btn" data-filter="awarded"><span class="dot dot-red"></span> Awarded</button>
-                <button class="filter-btn" data-filter="bidding"><span class="dot dot-yellow"></span> In Bidding / Tender</button>
-                <button class="filter-btn" data-filter="planning"><span class="dot dot-grey"></span> Planning</button>
+                <button class="filter-btn active" data-filter-type="industry" data-filter="all">All</button>
+                <button class="filter-btn" data-filter-type="industry" data-filter="waste-to-energy"><span class="dot dot-wte"></span> Waste-to-Energy</button>
+                <button class="filter-btn" data-filter-type="industry" data-filter="assembly"><span class="dot dot-assembly"></span> Assembly</button>
+                <button class="filter-btn" data-filter-type="industry" data-filter="municipal-waste-to-energy"><span class="dot dot-municipal"></span> Municipal WTE</button>
+                <button class="filter-btn" data-filter-type="industry" data-filter="manufacturing"><span class="dot dot-manufacturing"></span> Manufacturing</button>
+                <button class="filter-btn" data-filter-type="industry" data-filter="others"><span class="dot dot-others"></span> Others</button>
             </div>
         </div>
         <div id="card-container">Loading approved updates...</div>
@@ -248,14 +263,11 @@
             const div = L.DomUtil.create('div', 'info legend');
             div.innerHTML = `
                 <h4>Legend · Status</h4>
-                <i style="background: #16a34a"></i> In Operation / Completed<br>
-                <i style="background: #2563eb"></i> Under construction<br>
-                <i style="background: #dc2626"></i> Awarded<br>
-                <i style="background: #eab308"></i> In bidding / tender<br>
-                <i style="background: #64748b"></i> Planning<br>
-                <br>
-                <h4>Sector</h4>
-                <b>♻️</b> Waste-to-Energy<br>
+                <div class="legend-item" data-filter-type="status" data-filter="operating"><i style="background: #16a34a"></i> Operating</div>
+                <div class="legend-item" data-filter-type="status" data-filter="under construction"><i style="background: #2563eb"></i> Under Construction</div>
+                <div class="legend-item" data-filter-type="status" data-filter="awarded"><i style="background: #dc2626"></i> Awarded</div>
+                <div class="legend-item" data-filter-type="status" data-filter="tender"><i style="background: #eab308"></i> Tender</div>
+                <div class="legend-item" data-filter-type="status" data-filter="planning / potential"><i style="background: #64748b"></i> Planning / Potential</div>
             `;
             return div;
         };
@@ -263,152 +275,4 @@
 
         // 5. Global State & Marker Group
         let allApprovedData = [];
-        let activeFilter = 'all';
-        const markersLayerGroup = L.layerGroup().addTo(map);
-
-        // Helper: Categorize status strings
-        function getCategoryKey(status) {
-            const s = (status || '').toLowerCase();
-            if (s.includes('operation') || s.includes('completed')) return 'completed';
-            if (s.includes('construction')) return 'construction';
-            if (s.includes('awarded')) return 'awarded';
-            if (s.includes('bidding') || s.includes('tender')) return 'bidding';
-            if (s.includes('planning')) return 'planning';
-            return 'planning';
-        }
-
-        // Helper: Get Color & Badge Class
-        function getStatusStyling(statusKey) {
-            switch (statusKey) {
-                case 'completed': return { color: '#16a34a', tagClass: 'tag-green' };
-                case 'construction': return { color: '#2563eb', tagClass: 'tag-blue' };
-                case 'awarded': return { color: '#dc2626', tagClass: 'tag-red' };
-                case 'bidding': return { color: '#eab308', tagClass: 'tag-yellow' };
-                case 'planning': return { color: '#64748b', tagClass: 'tag-grey' };
-                default: return { color: '#64748b', tagClass: 'tag-grey' };
-            }
-        }
-
-        // 6. Render Cards and Map Pins Based on Filter
-        function renderDashboard() {
-            const container = document.getElementById('card-container');
-            container.innerHTML = '';
-            markersLayerGroup.clearLayers();
-
-            const visibleCoords = [];
-
-            // Filter data
-            const filteredData = allApprovedData.filter(row => {
-                if (activeFilter === 'all') return true;
-                return getCategoryKey(row.Status) === activeFilter;
-            });
-
-            filteredData.forEach(row => {
-                const lat = parseFloat(row.Latitude);
-                const lng = parseFloat(row.Longitude);
-                if (isNaN(lat) || isNaN(lng)) return;
-
-                const statusKey = getCategoryKey(row.Status);
-                const styling = getStatusStyling(statusKey);
-
-                // Add Circle Marker to Layer Group
-                const marker = L.circleMarker([lat, lng], {
-                    radius: 8,
-                    fillColor: styling.color,
-                    color: "#ffffff",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.95
-                }).addTo(markersLayerGroup);
-
-                marker.bindPopup(`<b>${row.Factory_Name}</b><br>${row.Status}<br><i>${row.Category}</i>`);
-                visibleCoords.push([lat, lng]);
-
-                // Create Sidebar Card
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <h2>♻️ ${row.Factory_Name}</h2>
-                    <span class="tag ${styling.tagClass}">${row.Status}</span>
-                    <div class="details">
-                        <strong>Category:</strong> ${row.Category}<br>
-                        <strong>Metrics:</strong> ${row.Key_Metrics || 'N/A'}<br><br>
-                        <strong>Latest Update:</strong><br>${row.Latest_Update || 'No updates available.'}
-                    </div>
-                    <div class="date">Last Updated: ${row.Last_Updated_Date || 'Unknown'}</div>
-                `;
-
-                // Interactivity
-                card.addEventListener('click', () => {
-                    map.flyTo([lat, lng], 13, { duration: 1.2 });
-                    marker.openPopup();
-                });
-
-                marker.on('click', () => {
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    card.style.borderColor = '#38bdf8';
-                    card.style.backgroundColor = '#0f172a';
-                    setTimeout(() => { 
-                        card.style.borderColor = '#334155'; 
-                        card.style.backgroundColor = '#1e293b'; 
-                    }, 2200);
-                });
-
-                container.appendChild(card);
-            });
-
-            // Adjust map view bounds to remaining pins
-            if (visibleCoords.length > 0) {
-                map.fitBounds(visibleCoords, { padding: [60, 60], maxZoom: 12 });
-            }
-
-            if (filteredData.length === 0) {
-                container.innerHTML = `<p style="color: #94a3b8; font-size: 0.9rem; text-align: center; margin-top: 30px;">No projects found under this status.</p>`;
-            }
-        }
-
-        // 7. Filter Button Click Handlers
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                activeFilter = btn.getAttribute('data-filter');
-                renderDashboard();
-            });
-        });
-
-        // 8. Collapsible Sidebar Toggle
-        const toggleBtn = document.getElementById('toggle-sidebar-btn');
-        const sidebar = document.getElementById('sidebar');
-
-        toggleBtn.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            toggleBtn.innerHTML = isCollapsed ? '☰ Show Dashboard' : '◀ Hide Dashboard';
-            
-            // Allow CSS animation to finish, then recalculate map dimensions
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 320);
-        });
-
-        // 9. Fetch Data from Google Sheet
-        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS8CWPQ4VAx1R47aR4IBqHpIbrJVraBd2eajHr0ZZCY3SsGOu2NuB13E7NEnVaIha-i9FCEhI2D7Vq7/pub?gid=594499741&single=true&output=csv';
-
-        Papa.parse(csvUrl + '&cachebuster=' + new Date().getTime(), {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                // Filter only Approved rows
-                allApprovedData = results.data.filter(row => row.Approved_For_Publish === 'TRUE');
-                renderDashboard();
-            },
-            error: function(err) {
-                document.getElementById('card-container').innerHTML = '<p style="color: #ef4444;">Failed to load data. Please check permissions.</p>';
-                console.error("CSV Fetch Error: ", err);
-            }
-        });
-    </script>
-</body>
-</html>
+        let active
