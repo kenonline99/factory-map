@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Cloudflare CDN for Reliable Global & China Access -->
+    <!-- Cloudflare CDN for Reliability -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -25,10 +25,6 @@
 
         .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
         .dot-wte { background: #10b981; } 
-        .dot-assembly { background: #3b82f6; } 
-        .dot-municipal { background: #8b5cf6; } 
-        .dot-manufacturing { background: #f59e0b; } 
-        .dot-others { background: #6b7280; } 
 
         #card-container { flex: 1; overflow-y: auto; padding: 16px 20px; }
         .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 14px; cursor: pointer; transition: all 0.2s ease; }
@@ -68,12 +64,9 @@
         <div class="sidebar-header">
             <h1>Review Dashboard</h1>
             <div class="filter-container">
+                <!-- Removed other industries, kept only All and WTE -->
                 <button class="filter-btn active" data-filter-type="industry" data-filter="all">All</button>
                 <button class="filter-btn" data-filter-type="industry" data-filter="waste-to-energy"><span class="dot dot-wte"></span> Waste-to-Energy</button>
-                <button class="filter-btn" data-filter-type="industry" data-filter="assembly"><span class="dot dot-assembly"></span> Assembly</button>
-                <button class="filter-btn" data-filter-type="industry" data-filter="municipal"><span class="dot dot-municipal"></span> Municipal WTE</button>
-                <button class="filter-btn" data-filter-type="industry" data-filter="manufacturing"><span class="dot dot-manufacturing"></span> Manufacturing</button>
-                <button class="filter-btn" data-filter-type="industry" data-filter="others"><span class="dot dot-others"></span> Others</button>
             </div>
         </div>
         <div id="card-container">Loading approved updates...</div>
@@ -85,23 +78,18 @@
     </div>
 
     <script>
-        // Global Error Catcher
-        window.addEventListener('error', function(e) {
-            document.getElementById('card-container').innerHTML = `<p style="color: #ef4444; padding: 20px;">System Error: Map library blocked or failed to load. Please disable adblockers or try another network.</p>`;
+        // Initialize Map Tiles (CartoDB Standard is highly reliable globally, Esri for Satellite)
+        const standardLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+        });
+        
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: 'Tiles &copy; Esri' 
         });
 
-        // Initialize Map with China-Accessible Tile Servers (Works in China & Malaysia without VPN)
-        const satelliteLayer = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', {
-            subdomains: ['1', '2', '3', '4'],
-            attribution: 'Tiles &copy; AutoNavi'
-        });
-        const standardLayer = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
-            subdomains: ['1', '2', '3', '4'],
-            attribution: 'Tiles &copy; AutoNavi'
-        });
-
-        const map = L.map('map', { center: [2.5, 112.0], zoom: 6, layers: [satelliteLayer] });
-        L.control.layers({ "Satellite": satelliteLayer, "Standard": standardLayer }, null, {position: 'topright'}).addTo(map);
+        // Set Standard as the default map so it loads immediately in China
+        const map = L.map('map', { center: [3.0, 101.5], zoom: 6, layers: [standardLayer] });
+        L.control.layers({ "Standard": standardLayer, "Satellite": satelliteLayer }, null, {position: 'topright'}).addTo(map);
 
         // Legend
         const legend = L.control({position: 'bottomright'});
@@ -114,6 +102,9 @@
                 <div class="legend-item" data-filter-type="status" data-filter="awarded"><i style="background: #dc2626"></i> Awarded</div>
                 <div class="legend-item" data-filter-type="status" data-filter="tender"><i style="background: #eab308"></i> Tender</div>
                 <div class="legend-item" data-filter-type="status" data-filter="planning"><i style="background: #64748b"></i> Planning / Potential</div>
+                <br>
+                <h4>Sector</h4>
+                <b>♻️</b> Waste-to-Energy<br>
             `;
             return div;
         };
@@ -124,7 +115,7 @@
         let activeFilterValue = 'all';
         const markersLayerGroup = L.layerGroup().addTo(map);
 
-        // "Fuzzy Match" helper to find columns even if headers have hidden spaces
+        // "Fuzzy Match" helper to find columns 
         function getVal(row, possibleKeys) {
             const actualKey = Object.keys(row).find(k => possibleKeys.some(pk => k.toLowerCase().includes(pk.toLowerCase())));
             return actualKey ? row[actualKey] : '';
@@ -141,16 +132,7 @@
 
         function matchIndustry(industry, filterValue) {
            const i = String(industry).toLowerCase().trim();
-           if (filterValue === 'waste-to-energy' && i === 'waste-to-energy') return true;
-           if (filterValue === 'assembly' && i === 'assembly') return true;
-           if (filterValue === 'municipal' && i.includes('municipal')) return true;
-           if (filterValue === 'manufacturing' && i === 'manufacturing') return true;
-           
-           // If "Others" is selected, match anything that is NOT one of the primary 4
-           if (filterValue === 'others') {
-               if (i === 'waste-to-energy' || i === 'assembly' || i.includes('municipal') || i === 'manufacturing') return false;
-               return true;
-           }
+           if (filterValue === 'waste-to-energy' && i.includes('waste')) return true;
            return false;
         }
 
@@ -260,37 +242,22 @@
             setTimeout(() => { map.invalidateSize(); }, 320);
         });
 
-        // Load CSV directly from GitHub repository (supports both data.csv.csv and data.csv)
-        function loadCsvData(primaryFile, fallbackFile) {
-            Papa.parse(primaryFile + '?cachebuster=' + new Date().getTime(), {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    const hasValidColumns = results.data && results.data.some(row => getVal(row, ['factory', 'name', 'status']));
-                    if (hasValidColumns) {
-                        allApprovedData = results.data.filter(row => {
-                            const approved = getVal(row, ['approved', 'publish']);
-                            return String(approved).toUpperCase().trim() === 'TRUE';
-                        });
-                        renderDashboard();
-                    } else if (fallbackFile) {
-                        loadCsvData(fallbackFile, null);
-                    } else {
-                        document.getElementById('card-container').innerHTML = '<p style="color: #ef4444; padding: 20px;">Failed to load data. Please verify that data.csv.csv (or data.csv) is uploaded in your GitHub repository.</p>';
-                    }
-                },
-                error: function(err) {
-                    if (fallbackFile) {
-                        loadCsvData(fallbackFile, null);
-                    } else {
-                        document.getElementById('card-container').innerHTML = '<p style="color: #ef4444; padding: 20px;">Failed to load data. Please verify that data.csv.csv (or data.csv) is uploaded in your GitHub repository.</p>';
-                    }
-                }
-            });
-        }
+        // Load Local CSV from GitHub
+        const csvUrl = 'data.csv';
 
-        loadCsvData('data.csv.csv', 'data.csv');
+        Papa.parse(csvUrl + '?cachebuster=' + new Date().getTime(), {
+            download: true, header: true, skipEmptyLines: true,
+            complete: function(results) {
+                allApprovedData = results.data.filter(row => {
+                    const approved = getVal(row, ['approved', 'publish']);
+                    return String(approved).toUpperCase().trim() === 'TRUE';
+                });
+                renderDashboard();
+            },
+            error: function(err) {
+                document.getElementById('card-container').innerHTML = '<p style="color: #ef4444; padding: 20px;">Failed to load data. Please ensure data.csv is uploaded to GitHub.</p>';
+            }
+        });
     </script>
 </body>
 </html>
