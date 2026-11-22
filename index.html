@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Switched to Cloudflare CDN for 100% Reliability -->
+    <!-- Cloudflare CDN for Reliable Global & China Access -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -90,9 +90,15 @@
             document.getElementById('card-container').innerHTML = `<p style="color: #ef4444; padding: 20px;">System Error: Map library blocked or failed to load. Please disable adblockers or try another network.</p>`;
         });
 
-        // Initialize Map
-        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
-        const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
+        // Initialize Map with China-Accessible Tile Servers (Works in China & Malaysia without VPN)
+        const satelliteLayer = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', {
+            subdomains: ['1', '2', '3', '4'],
+            attribution: 'Tiles &copy; AutoNavi'
+        });
+        const standardLayer = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            subdomains: ['1', '2', '3', '4'],
+            attribution: 'Tiles &copy; AutoNavi'
+        });
 
         const map = L.map('map', { center: [2.5, 112.0], zoom: 6, layers: [satelliteLayer] });
         L.control.layers({ "Satellite": satelliteLayer, "Standard": standardLayer }, null, {position: 'topright'}).addTo(map);
@@ -254,25 +260,37 @@
             setTimeout(() => { map.invalidateSize(); }, 320);
         });
 
-        // 1. We start with the URL you provided
-        let rawUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS8CWPQ4VAx1R47aR4IBqHpIbrJVraBd2eajHr0ZZCY3SsGOu2NuB13E7NEnVaIha-i9FCEhI2D7Vq7/pubhtml';
-        
-        // 2. We dynamically convert it from /pubhtml to /pub?output=csv so the map engine can read it
-        const csvUrl = rawUrl.replace('/pubhtml', '/pub?output=csv');
+        // Load CSV directly from GitHub repository (supports both data.csv.csv and data.csv)
+        function loadCsvData(primaryFile, fallbackFile) {
+            Papa.parse(primaryFile + '?cachebuster=' + new Date().getTime(), {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const hasValidColumns = results.data && results.data.some(row => getVal(row, ['factory', 'name', 'status']));
+                    if (hasValidColumns) {
+                        allApprovedData = results.data.filter(row => {
+                            const approved = getVal(row, ['approved', 'publish']);
+                            return String(approved).toUpperCase().trim() === 'TRUE';
+                        });
+                        renderDashboard();
+                    } else if (fallbackFile) {
+                        loadCsvData(fallbackFile, null);
+                    } else {
+                        document.getElementById('card-container').innerHTML = '<p style="color: #ef4444; padding: 20px;">Failed to load data. Please verify that data.csv.csv (or data.csv) is uploaded in your GitHub repository.</p>';
+                    }
+                },
+                error: function(err) {
+                    if (fallbackFile) {
+                        loadCsvData(fallbackFile, null);
+                    } else {
+                        document.getElementById('card-container').innerHTML = '<p style="color: #ef4444; padding: 20px;">Failed to load data. Please verify that data.csv.csv (or data.csv) is uploaded in your GitHub repository.</p>';
+                    }
+                }
+            });
+        }
 
-        Papa.parse(csvUrl + '&cachebuster=' + new Date().getTime(), {
-            download: true, header: true, skipEmptyLines: true,
-            complete: function(results) {
-                allApprovedData = results.data.filter(row => {
-                    const approved = getVal(row, ['approved', 'publish']);
-                    return String(approved).toUpperCase().trim() === 'TRUE';
-                });
-                renderDashboard();
-            },
-            error: function(err) {
-                document.getElementById('card-container').innerHTML = '<p style="color: #ef4444; padding: 20px;">Failed to load data. The Google Sheet URL could not be parsed as a CSV.</p>';
-            }
-        });
+        loadCsvData('data.csv.csv', 'data.csv');
     </script>
 </body>
 </html>
